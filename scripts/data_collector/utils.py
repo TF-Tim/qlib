@@ -8,6 +8,8 @@ import time
 import bisect
 import pickle
 import random
+import os
+import logging
 import requests
 import functools
 from pathlib import Path
@@ -356,7 +358,19 @@ def get_us_stock_symbols(qlib_data_path: [str, Path] = None) -> list:
         return _symbols
 
     if _US_SYMBOLS is None:
-        _all_symbols = _get_eastmoney() + _get_nasdaq() + _get_nyse()
+        skip_em = os.getenv("QLIB_SKIP_EASTMONEY", "0") == "1"
+        symbols = []
+
+        if not skip_em:
+            try:
+                symbols += _get_eastmoney()
+            except Exception as e:  # pragma: no cover - log warning then continue
+                logging.getLogger(__name__).warning("Skipping Eastmoney due to error: %s", e)
+
+        symbols += _get_nasdaq()
+        symbols += _get_nyse()
+
+        _all_symbols = symbols
         if qlib_data_path is not None:
             for _index in ["nasdaq100", "sp500"]:
                 ins_df = pd.read_csv(
